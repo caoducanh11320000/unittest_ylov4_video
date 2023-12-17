@@ -583,6 +583,7 @@ int read_files_in_dir(const char *p_dir_name, std::vector<std::string> &file_nam
 
 trt_error TRT_Inference::init_inference(const char * input_folder, std::vector<std::string> &file_names){
     // create a model using the API directly and serialize it to a stream
+    printf("Thuc hien ham Init\n");
     char *trtModelStream{nullptr};
     size_t size{0};
 
@@ -612,6 +613,7 @@ trt_error TRT_Inference::init_inference(const char * input_folder, std::vector<s
     assert(context != nullptr);
     delete[] trtModelStream;
 
+    printf("ket thuc ham Init\n");
     return TRT_RESULT_SUCCESS;
 }
 
@@ -714,22 +716,24 @@ bool isVideo(const std::string& filename) {
 //     return TRT_RESULT_SUCCESS;
 // }
 
-trt_error TRT_Inference::trt_detection(std::vector<cv::Mat> &input_img, std::vector< std::vector<trt_results>> &results){
+trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector< std::vector<trt_results> > &results, int sizes){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
     int fcount = 0;
-    for (int f = 0; f < (int)input_img.size(); f++) {    
+    for (int f = 0; f < sizes; f++) {    
         fcount++;
-        if (fcount < BATCH_SIZE && f + 1 != (int)input_img.size()) continue;
+        if (fcount < BATCH_SIZE && f + 1 != sizes) continue;
         // xu li anh
         for (int b = 0; b < fcount; b++) {
-            cv::Mat img = input_img[f - fcount + 1 + b];
+            cv::Mat img = Input[f - fcount + 1 + b].input_img;
+            if(!img.empty()){
             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
                 data[b * 3 * INPUT_H * INPUT_W + i] = pr_img.at<cv::Vec3b>(i)[2] / 255.0;
                 data[b * 3 * INPUT_H * INPUT_W + i + INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[1] / 255.0;
                 data[b * 3 * INPUT_H * INPUT_W + i + 2 * INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[0] / 255.0;
+            }
             }
         }
 
@@ -744,24 +748,30 @@ trt_error TRT_Inference::trt_detection(std::vector<cv::Mat> &input_img, std::vec
             auto& res = batch_res[b];
             nms(res, &prob[b * OUTPUT_SIZE]);
         }
+
+        std::cout <<"kic thuoc cua fcount:" <<fcount <<std::endl;
+
         for (int b = 0; b < fcount; b++) {
-            auto& res = batch_res[b]; // res[2].ClassID va res[2].class_id khac gi nhau
-            std::vector <trt_results> image_result;
+        auto& res = batch_res[b];
+        std::vector<trt_results> image_result;
 
             for (size_t j = 0; j < res.size(); j++) {
                 trt_results boundingbox_result;
                 boundingbox_result.ClassID = res[j].class_id;
-                boundingbox_result.Confidence= res[j].det_confidence;
-                boundingbox_result.bbox[0]= res[j].bbox[0];
-                boundingbox_result.bbox[1]= res[j].bbox[1];
-                boundingbox_result.bbox[2]= res[j].bbox[2];
-                boundingbox_result.bbox[3]= res[j].bbox[3];
+                boundingbox_result.Confidence = res[j].det_confidence;
+                boundingbox_result.bbox[0] = res[j].bbox[0];
+                boundingbox_result.bbox[1] = res[j].bbox[1];
+                boundingbox_result.bbox[2] = res[j].bbox[2];
+                boundingbox_result.bbox[3] = res[j].bbox[3];
 
-                image_result.push_back(boundingbox_result);
-            }
-            results.push_back(image_result);
+            image_result.push_back(boundingbox_result);
         }
 
+        // Thêm image_result vào results
+        results.push_back(image_result);
+        }
+
+        // Di chuyển việc reset fcount xuống cuối vòng lặp
         fcount = 0;
     }
     

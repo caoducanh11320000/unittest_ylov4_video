@@ -12,6 +12,9 @@ TRT_Inference test1;
 std::vector<std::string> file_image;
 std::vector<cv::Mat> input_img; 
 std::vector< std::vector<trt_results>> results;
+std::vector<IMXAIEngine::input> Input(10); // neu ko khai bao so luong se bi loi
+// khai bao size cho dau vao
+int sizes= 0;
 
 int main(int argc, char** argv){
 
@@ -24,6 +27,7 @@ int main(int argc, char** argv){
     else if (argc == 3 && std::string(argv[1]) == "-d") {
         // goi ham init
         test1.init_inference(argv[2],file_image);
+     
     } 
     else {
         std::cerr << "arguments not right!" << std::endl;
@@ -33,28 +37,43 @@ int main(int argc, char** argv){
     }
 
     /// thuc hien ham do_Inference o day
-    std::string folder= std::string(argv[2]);
-    for(int i=0; i< (int)file_image.size(); i++){
-        cv::Mat img = cv::imread(folder + "/" + file_image[i]);
-        if(!img.empty()) input_img.push_back(img);
-        else std::cout << "That bai" << std::endl;
-    }
+
+        // de test 
     for (int i=0; i< (int)file_image.size(); i++)
     {
         std::cout <<"Ten anh la:" << file_image[i] <<std::endl;
     }
-    
-  
-    test1.trt_detection(input_img, results);
-    std::cout << results.size() << std::endl;
-    for (int i = 0; i < (int)results.size(); i++)
-    {
-        auto x= results[i];
-        std::cout <<"Anh" << std::endl;
-        for(int j=0; j< (int)x.size(); j++){
-            std::cout <<"Bounding box: " << x[j].ClassID << x[i].Confidence << x[i].bbox[0]<< x[i].bbox[1] << x[i].bbox[2] << x[i].bbox[3] <<std::endl;
-        }
+
+    std::string folder= std::string(argv[2]);
+    for(int i=0; i< (int)file_image.size(); i++){
+
+        std::cout << "Thuc hien voi anh:" << i <<std::endl;
+
+        cv::Mat img = cv::imread(folder + "/" + file_image[i]);
+        if(!img.empty()) {
+            //input_img.push_back(img); // danh so ID o day luon
+            Input[i].input_img.push_back(img);
+            Input[i].id_img= i;    
+            sizes++;
+            std::cout<< "thanh cong voi anh" << i <<std::endl;
+            }
+        else std::cout << "That bai" << std::endl;
     }
+
     
+    test1.trt_detection(Input, results, sizes);
+
+    std::cout << "so luong ket qua:" << results.size() << std::endl;
+
+    for (int i = 0; i < (int) results.size(); i++) 
+    {
+    auto x = results[i];
+    std::cout << "Anh" << std::endl;
+    std::cout << x.size() << std::endl;
+    for (int j = 0; j < (int)x.size(); j++)
+    {
+        std::cout << "Bounding box: " << x[j].ClassID << x[j].Confidence << x[j].bbox[0] << x[j].bbox[1] << x[j].bbox[2] << x[j].bbox[3] << std::endl;
+    }
+    }
 
 }
