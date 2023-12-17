@@ -15,6 +15,7 @@ std::vector< std::vector<trt_results>> results;
 std::vector<IMXAIEngine::input> Input(10); // neu ko khai bao so luong se bi loi
 // khai bao size cho dau vao
 int sizes= 0;
+std::vector<IMXAIEngine::output> Output;
 
 int main(int argc, char** argv){
 
@@ -61,18 +62,18 @@ int main(int argc, char** argv){
     }
 
     
-    test1.trt_detection(Input, results, sizes);
+    test1.trt_detection(Input, Output, sizes);
 
-    std::cout << "so luong ket qua:" << results.size() << std::endl;
+    std::cout << "so luong ket qua:" << Output.size() << std::endl;
 
-    for (int i = 0; i < (int) results.size(); i++) 
+    for (int i = 0; i < (int) Output.size(); i++) 
     {
-    auto x = results[i];
-    std::cout << "Anh" << std::endl;
-    std::cout << x.size() << std::endl;
-    for (int j = 0; j < (int)x.size(); j++)
+    auto x = Output[i];
+    std::cout << "ID anh: " <<x.id << std::endl;
+    std::cout << x.results.size() << std::endl;
+    for (int j = 0; j < (int)x.results.size(); j++)
     {
-        std::cout << "Bounding box: " << x[j].ClassID << x[j].Confidence << x[j].bbox[0] << x[j].bbox[1] << x[j].bbox[2] << x[j].bbox[3] << std::endl;
+        std::cout << "Bounding box: " << x.results[j].ClassID << x.results[j].Confidence << x.results[j].bbox[0] << x.results[j].bbox[1] << x.results[j].bbox[2] << x.results[j].bbox[3] << std::endl;
     }
     }
 

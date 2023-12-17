@@ -35,6 +35,11 @@ namespace IMXAIEngine
         float bbox[4];
     } trt_results;
     
+    typedef struct{
+        std::vector<IMXAIEngine:: trt_results> results;
+        int id;
+    } output;
+
     typedef struct
     {
         cv::Mat input_img;
@@ -69,7 +74,7 @@ namespace IMXAIEngine
         }
         trt_error init_inference(const char * input_folder, std::vector<std::string> &file_names); 
         trt_error trt_APIModel();
-        trt_error trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector< std::vector<trt_results> > &results, int sizes);
+        trt_error trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector<IMXAIEngine::output> &Output , int sizes);
     };
 
 } // namespace IMXAIEngine

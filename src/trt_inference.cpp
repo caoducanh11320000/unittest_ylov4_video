@@ -716,7 +716,7 @@ bool isVideo(const std::string& filename) {
 //     return TRT_RESULT_SUCCESS;
 // }
 
-trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector< std::vector<trt_results> > &results, int sizes){
+trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector<IMXAIEngine::output> &Output , int sizes){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
@@ -749,11 +749,12 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, s
             nms(res, &prob[b * OUTPUT_SIZE]);
         }
 
-        std::cout <<"kic thuoc cua fcount:" <<fcount <<std::endl;
+        std::cout <<"kich thuoc cua fcount:" <<fcount <<std::endl;
 
         for (int b = 0; b < fcount; b++) {
         auto& res = batch_res[b];
         std::vector<trt_results> image_result;
+        IMXAIEngine::output out_img;
 
             for (size_t j = 0; j < res.size(); j++) {
                 trt_results boundingbox_result;
@@ -764,11 +765,14 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, s
                 boundingbox_result.bbox[2] = res[j].bbox[2];
                 boundingbox_result.bbox[3] = res[j].bbox[3];
 
-            image_result.push_back(boundingbox_result);
+            //image_result.push_back(boundingbox_result);
+            out_img.results.push_back(boundingbox_result);
         }
 
+
         // Thêm image_result vào results
-        results.push_back(image_result);
+        out_img.id= f;
+        Output.push_back(out_img);
         }
 
         // Di chuyển việc reset fcount xuống cuối vòng lặp
