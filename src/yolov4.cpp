@@ -23,9 +23,9 @@ int main(int argc, char** argv){
 
     cudaSetDevice(DEVICE);
 
-    if (argc == 2 && std::string(argv[1]) == "-s") {
+    if (argc == 3 && std::string(argv[1]) == "-s") { // modify argc if you want
         // co the goi ham API model o day
-        test1.trt_APIModel();     
+        test1.trt_APIModel( std::string(argv[2]) );     
     } 
     else if (argc == 3 && std::string(argv[1]) == "-d") {
         // goi ham init

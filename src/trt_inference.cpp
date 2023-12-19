@@ -6,7 +6,7 @@
 #define NMS_THRESH 0.4
 #define BBOX_CONF_THRESH 0.5
 
-#define BATCH_SIZE 4
+#define BATCH_SIZE 2
 
 
 using namespace IMXAIEngine;
@@ -228,14 +228,15 @@ ILayer* convBnLeaky(INetworkDefinition *network, std::map<std::string, Weights>&
 }
 
 // Creat the engine using only the API and not any parser.
-ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilderConfig* config, DataType dt) {
+ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilderConfig* config, DataType dt, std::string model_path) {
     INetworkDefinition* network = builder->createNetworkV2(0U);
 
     // Create input tensor of shape {3, INPUT_H, INPUT_W} with name INPUT_BLOB_NAME
     ITensor* data = network->addInput(INPUT_BLOB_NAME, dt, Dims3{3, INPUT_H, INPUT_W});
     assert(data);
 
-    std::map<std::string, Weights> weightMap = loadWeights("../yolov4.wts");
+    std::map<std::string, Weights> weightMap = loadWeights(model_path);  // path of .weight
+    //std::map<std::string, Weights> weightMap = loadWeights("../yolov4.wts"); 
     Weights emptywts{DataType::kFLOAT, nullptr, 0};
 
     // define each layer.
@@ -498,13 +499,13 @@ ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilder
     return engine;
 }
 
-void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream) { // giong het nhau
+void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream, std::string model_path) { // giong het nhau
     // Create builder
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
 
     // Create model to populate the network, then set the outputs and create an engine
-    ICudaEngine* engine = createEngine(maxBatchSize, builder, config, DataType::kFLOAT);
+    ICudaEngine* engine = createEngine(maxBatchSize, builder, config, DataType::kFLOAT, model_path);
     assert(engine != nullptr);
 
     // Serialize the engine
@@ -515,11 +516,13 @@ void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream) { // gion
     builder->destroy();
     config->destroy();
 }
-trt_error TRT_Inference::trt_APIModel(){
+
+trt_error TRT_Inference::trt_APIModel(std::string model_path){
     IHostMemory* modelStream{nullptr};
-    APIToModel(BATCH_SIZE, &modelStream);
+    APIToModel(BATCH_SIZE, &modelStream, model_path);
     assert(modelStream != nullptr);
-    std::ofstream p("yolov4.engine", std::ios::binary);
+    // them duong dan tuy chon o day 
+    std::ofstream p("yolov4.engine", std::ios::binary); 
     if (!p) {
         std::cerr << "could not open plan output file" << std::endl;
         return TRT_RESULT_ERROR;
