@@ -1,10 +1,13 @@
 #include "trt_inference.h"
 
+
 #define USE_FP16  // comment out this if want to use FP32
 #define DEVICE 0  // GPU id
 #define NMS_THRESH 0.4
 #define BBOX_CONF_THRESH 0.5
-#define BATCH_SIZE 1
+
+#define BATCH_SIZE 4
+
 
 using namespace IMXAIEngine;
 using namespace nvinfer1;
@@ -495,7 +498,7 @@ ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilder
     return engine;
 }
 
-void APIToModel(unsigned int maxBatchSize, IHostMemory** modelStream) { // giong het nhau
+void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream) { // giong het nhau
     // Create builder
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
@@ -659,74 +662,19 @@ bool isVideo(const std::string& filename) {
     return false;
 }
 
-// trt_error TRT_Inference::trt_detection(std::string folder , std::vector<std::string> &file_names){
-//     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
-//     static float prob[BATCH_SIZE * OUTPUT_SIZE];
-//     // duyet qua tung anh
-
-//     // Test ten anh
-//     for (int i=0; i< (int)file_names.size() ; i++ )
-//     {
-//         std::cout << "Ten anh:" << file_names[i] << std::endl;
-//     }
-    
-//     int fcount = 0;
-//     for (int f = 0; f < (int)file_names.size(); f++) {
-       
-
-//         fcount++;
-//         if (fcount < BATCH_SIZE && f + 1 != (int)file_names.size()) continue;
-//         for (int b = 0; b < fcount; b++) {
-//             cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
-//             if (img.empty()) continue;
-//             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
-//             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
-//                 data[b * 3 * INPUT_H * INPUT_W + i] = pr_img.at<cv::Vec3b>(i)[2] / 255.0;
-//                 data[b * 3 * INPUT_H * INPUT_W + i + INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[1] / 255.0;
-//                 data[b * 3 * INPUT_H * INPUT_W + i + 2 * INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[0] / 255.0;
-//             }
-//         }
-
-//         // Run inference
-//         auto start = std::chrono::system_clock::now();
-//         doInference(*context, data, prob, BATCH_SIZE);
-//         auto end = std::chrono::system_clock::now();
-//         std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
-        
-//         std::vector<std::vector<Yolo::Detection>> batch_res(fcount);
-//         for (int b = 0; b < fcount; b++) {
-//             auto& res = batch_res[b];
-//             nms(res, &prob[b * OUTPUT_SIZE]);
-//         }
-//         for (int b = 0; b < fcount; b++) {
-//             auto& res = batch_res[b];
-//             //std::cout << res.size() << std::endl;
-//             cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
-//             for (size_t j = 0; j < res.size(); j++) {
-//                 cv::Rect r = get_rect(img, res[j].bbox);
-//                 cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
-//                 cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
-//             }
-//             cv::imwrite("_" + file_names[f - fcount + 1 + b], img);
-//         }
-//         fcount = 0;
-//     }
-    
-
-//     return TRT_RESULT_SUCCESS;
-// }
-
-trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector<IMXAIEngine::output> &Output , int sizes){
+trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs ){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
     int fcount = 0;
-    for (int f = 0; f < sizes; f++) {    
+    int img_id=0;
+    for (int f = 0; f < (int) trt_inputs.size(); f++) {    
         fcount++;
-        if (fcount < BATCH_SIZE && f + 1 != sizes) continue;
+        if (fcount < BATCH_SIZE && f + 1 != (int)trt_inputs.size() ) continue;
         // xu li anh
         for (int b = 0; b < fcount; b++) {
-            cv::Mat img = Input[f - fcount + 1 + b].input_img;
+            //cv::Mat img = trt_inputs[f - fcount + 1 + b].input_img;
+            cv::Mat img = trt_inputs[img_id + b].input_img;
             if(!img.empty()){
             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
@@ -736,6 +684,7 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, s
             }
             }
         }
+    
 
         // Run inference
         auto start = std::chrono::system_clock::now();
@@ -754,7 +703,7 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, s
         for (int b = 0; b < fcount; b++) {
         auto& res = batch_res[b];
         std::vector<trt_results> image_result;
-        IMXAIEngine::output out_img;
+        IMXAIEngine::trt_output out_img;
 
             for (size_t j = 0; j < res.size(); j++) {
                 trt_results boundingbox_result;
@@ -771,11 +720,12 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::input> &Input, s
 
 
         // Thêm image_result vào results
-        out_img.id= f;
-        Output.push_back(out_img);
+        out_img.id= img_id + b ; /// phan ID nay can xem lai, voi batch size=1 thi dung, con neu batchsize khac thi chua chac
+        trt_outputs.push_back(out_img);
         }
 
         // Di chuyển việc reset fcount xuống cuối vòng lặp
+        img_id= img_id + fcount;
         fcount = 0;
     }
     

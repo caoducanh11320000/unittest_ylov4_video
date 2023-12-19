@@ -38,35 +38,35 @@ namespace IMXAIEngine
     typedef struct{
         std::vector<IMXAIEngine:: trt_results> results;
         int id;
-    } output;
+    } trt_output;
 
     typedef struct
     {
         cv::Mat input_img;
         int id_img;
         
-    } input;
+    } trt_input;
     
 
     class TRT_Inference
     {
     private:
-        IRuntime* runtime= NULL;
-        ICudaEngine* engine= NULL;
-        IExecutionContext* context= NULL;
+        IRuntime* runtime= nullptr;
+        ICudaEngine* engine= nullptr;
+        IExecutionContext* context= nullptr;
 
     public:
         TRT_Inference();
         ~TRT_Inference(){
-            if (context != NULL)
+            if (context != nullptr)
             {
                 context->destroy();
             }
-            if (context != NULL)
+            if (engine != nullptr)
             {
                 engine->destroy();
             }
-            if (context != NULL)
+            if (runtime != nullptr)
             {
                 runtime->destroy();
             }
@@ -74,7 +74,7 @@ namespace IMXAIEngine
         }
         trt_error init_inference(const char * input_folder, std::vector<std::string> &file_names); 
         trt_error trt_APIModel();
-        trt_error trt_detection(std::vector<IMXAIEngine::input> &Input, std::vector<IMXAIEngine::output> &Output , int sizes);
+        trt_error trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs );
     };
 
 } // namespace IMXAIEngine

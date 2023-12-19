@@ -12,10 +12,12 @@ TRT_Inference test1;
 std::vector<std::string> file_image;
 std::vector<cv::Mat> input_img; 
 std::vector< std::vector<trt_results>> results;
-std::vector<IMXAIEngine::input> Input(10); // neu ko khai bao so luong se bi loi
+std::vector< IMXAIEngine:: trt_input> trt_inputs;
+std::vector< IMXAIEngine:: trt_output> trt_outputs;
+
 // khai bao size cho dau vao
 int sizes= 0;
-std::vector<IMXAIEngine::output> Output;
+
 
 int main(int argc, char** argv){
 
@@ -51,24 +53,25 @@ int main(int argc, char** argv){
         std::cout << "Thuc hien voi anh:" << i <<std::endl;
 
         cv::Mat img = cv::imread(folder + "/" + file_image[i]);
+        IMXAIEngine:: trt_input trt_input;
         if(!img.empty()) {
             //input_img.push_back(img); // danh so ID o day luon
-            Input[i].input_img.push_back(img);
-            Input[i].id_img= i;    
-            sizes++;
+            trt_input.input_img= img;
+            trt_input.id_img = i;
+            trt_inputs.push_back(trt_input);
             std::cout<< "thanh cong voi anh" << i <<std::endl;
             }
         else std::cout << "That bai" << std::endl;
     }
 
     
-    test1.trt_detection(Input, Output, sizes);
+    test1.trt_detection(trt_inputs, trt_outputs);
 
-    std::cout << "so luong ket qua:" << Output.size() << std::endl;
+    std::cout << "so luong ket qua:" << trt_outputs.size() << std::endl;
 
-    for (int i = 0; i < (int) Output.size(); i++) 
+    for (int i = 0; i < (int) trt_outputs.size(); i++) 
     {
-    auto x = Output[i];
+    auto x = trt_outputs[i];
     std::cout << "ID anh: " <<x.id << std::endl;
     std::cout << x.results.size() << std::endl;
     for (int j = 0; j < (int)x.results.size(); j++)
