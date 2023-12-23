@@ -16,6 +16,7 @@
 #include "mish.h"
 #include "yololayer.h"
 #include <algorithm>
+#include <filesystem>
 
 using namespace nvinfer1;
 
@@ -72,7 +73,7 @@ namespace IMXAIEngine
             }
             printf("Da huy Inference \n");
         }
-        trt_error init_inference(std::string engine_name ,const char * input_folder, std::vector<std::string> &file_names); 
+        trt_error init_inference(std::string engine_name); 
         trt_error trt_APIModel(std::string model_path);
         trt_error trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs );
     };

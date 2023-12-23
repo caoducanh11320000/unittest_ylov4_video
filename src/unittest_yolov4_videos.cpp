@@ -1,12 +1,14 @@
 #include <iostream>
 #include "trt_inference.h"
+#include <opencv2/opencv.hpp>
+#include <filesystem>
 
 #define DEVICE 0  // GPU id
 
 
 using namespace IMXAIEngine;
 using namespace nvinfer1;
-
+namespace fs = std::filesystem;
 
 TRT_Inference test1;
 std::vector<std::string> file_image;
@@ -29,7 +31,7 @@ int main(int argc, char** argv){
     } 
     else if (argc == 4 && std::string(argv[1]) == "-d") {
         // goi ham init
-        test1.init_inference(std::string(argv[2]), argv[3], file_image);
+        test1.init_inference(std::string(argv[2]));  // truyen vao path cua video
      
     } 
     else {
@@ -39,32 +41,36 @@ int main(int argc, char** argv){
         return -1;
     }
 
-    /// thuc hien ham do_Inference o day
+    // chuyen video thanh anh
+    std::string video_path = std::string(argv[3]);
+    cv::VideoCapture cap(video_path)
+    if(!cap.isOpened()){
+        std::cout <<" Khong the mo video" <<std::endl;
+    }
+    // tao duong dan thu muc
+    std::string outputDir = "image";
+    fs::create_directories(outputDir);
+    int id_img=0;
+    IMXAIEngine::trt_input trt_input;
+    while(true){
+        cv::Mat img;
+        cap >> img;
+        if(img.empty()){
+            std::cout<<"Het video" <<std::endl;
+            break;
+        }
 
-        // de test 
-    for (int i=0; i< (int)file_image.size(); i++)
-    {
-        std::cout <<"Ten anh la:" << file_image[i] <<std::endl;
+        // Lưu khung hình thành ảnh trong thư mục cụ thể
+        std::string filename = outputDir + "/frame_" + std::to_string(id_img) + ".png";
+        cv::imwrite(filename, frame);  // ti nua truyen outputDir vao trt_detection
+
+        trt_input.id_img= id_img;
+        trt_input.input_img= img;
+        trt_inputs.push_back(trt_input);
+        id ++;
     }
 
-    std::string folder= std::string(argv[3]);
-    for(int i=0; i< (int)file_image.size(); i++){
-
-        std::cout << "Thuc hien voi anh:" << i <<std::endl;
-
-        cv::Mat img = cv::imread(folder + "/" + file_image[i]);
-        IMXAIEngine:: trt_input trt_input;
-        if(!img.empty()) {
-            //input_img.push_back(img); // danh so ID o day luon
-            trt_input.input_img= img;
-            trt_input.id_img = i;
-            trt_inputs.push_back(trt_input);
-            std::cout<< "thanh cong voi anh" << i <<std::endl;
-            }
-        else std::cout << "That bai" << std::endl;
-    }
-
-    
+   
     test1.trt_detection(trt_inputs, trt_outputs);
 
     std::cout << "so luong ket qua:" << trt_outputs.size() << std::endl;

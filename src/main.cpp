@@ -1,18 +1,27 @@
-#include "trt_inference.h"
-
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <vector>
+#include <chrono>
+#include <opencv2/opencv.hpp>
+#include <dirent.h>
+#include "NvInfer.h"
+#include "utils.h"
+#include "cuda_runtime_api.h"
+#include "logging.h"
+#include "yololayer.h"
+#include "mish.h"
 
 #define USE_FP16  // comment out this if want to use FP32
 #define DEVICE 0  // GPU id
 #define NMS_THRESH 0.4
 #define BBOX_CONF_THRESH 0.5
-
 #define BATCH_SIZE 1
 
-
-using namespace IMXAIEngine;
 using namespace nvinfer1;
 
-// do the thay doi sau
+// stuff we know about the network and the input/output blobs
 static const int INPUT_H = Yolo::INPUT_H;
 static const int INPUT_W = Yolo::INPUT_W;
 static const int DETECTION_SIZE = sizeof(Yolo::Detection) / sizeof(float);
@@ -21,35 +30,29 @@ const char* INPUT_BLOB_NAME = "data";
 const char* OUTPUT_BLOB_NAME = "prob";
 static Logger gLogger;
 
-TRT_Inference::TRT_Inference(){
-    printf("khoi tao inference \n");
-}
-
-/// Xu li anh 
-
-cv::Mat preprocess_img(cv::Mat& img) { // resize anhr goc ve anh xu  li
+cv::Mat preprocess_img(cv::Mat& img) {
     int w, h, x, y;
-    float r_w = INPUT_W / (img.cols*1.0);  // Tinh ti le Scale, doj chenh lenh giua dau vao real va dau vao mong muon
-    float r_h = INPUT_H / (img.rows*1.0); 
-    if (r_h > r_w) {     // cai nao cos do chenh lech nho hon, se duoc uu tien gan gia tri mong muon
-        w = INPUT_W;    // W co do chenh lech nho hon
-        h = r_w * img.rows;   // H phai dam bao va giu ti le voi W nhu anh goc
-        x = 0;                // Toa di theo chieu ngang, muon datj copy
-        y = (INPUT_H - h) / 2;  // Toa do theo chieu doc
+    float r_w = INPUT_W / (img.cols*1.0);
+    float r_h = INPUT_H / (img.rows*1.0);
+    if (r_h > r_w) {
+        w = INPUT_W;
+        h = r_w * img.rows;
+        x = 0;
+        y = (INPUT_H - h) / 2;
     } else {
         w = r_h* img.cols;
         h = INPUT_H;
         x = (INPUT_W - w) / 2;
         y = 0;
     }
-    cv::Mat re(h, w, CV_8UC3);   // Tao ma tran, 8UC3 tuc la 8 unsignchar 3 kenh mau: R, G, B
-    cv::resize(img, re, re.size());   // resize lai anh
-    cv::Mat out(INPUT_H, INPUT_W, CV_8UC3, cv::Scalar(128, 128, 128));  //tao ma tran, 128 128 128 tuc la anh nay se co mau xam
+    cv::Mat re(h, w, CV_8UC3);
+    cv::resize(img, re, re.size());
+    cv::Mat out(INPUT_H, INPUT_W, CV_8UC3, cv::Scalar(128, 128, 128));
     re.copyTo(out(cv::Rect(x, y, re.cols, re.rows)));
     return out;
 }
 
-cv::Rect get_rect(cv::Mat& img, float bbox[4]) {   // ham de chuyen bounding box tu anh xu li ve anh goc
+cv::Rect get_rect(cv::Mat& img, float bbox[4]) {
     int l, r, t, b;
     float r_w = INPUT_W / (img.cols * 1.0);
     float r_h = INPUT_H / (img.rows * 1.0);
@@ -75,8 +78,7 @@ cv::Rect get_rect(cv::Mat& img, float bbox[4]) {   // ham de chuyen bounding box
     return cv::Rect(l, t, r-l, b-t);
 }
 
-// thay doi tuy vao model, dung chung dc cho cac model Yolo
-float iou(float lbox[4], float rbox[4]) { //tính toán IoU (Intersection over Union) giữa hai bounding box
+float iou(float lbox[4], float rbox[4]) {
     float interBox[] = {
         std::max(lbox[0] - lbox[2]/2.f , rbox[0] - rbox[2]/2.f), //left
         std::min(lbox[0] + lbox[2]/2.f , rbox[0] + rbox[2]/2.f), //right
@@ -91,12 +93,12 @@ float iou(float lbox[4], float rbox[4]) { //tính toán IoU (Intersection over U
     return interBoxS/(lbox[2]*lbox[3] + rbox[2]*rbox[3] -interBoxS);
 }
 
-bool cmp(const Yolo::Detection& a, const Yolo::Detection& b) { // ham so sanh do tin cay (kha nang co doi tuong trong khung hinh)
+bool cmp(const Yolo::Detection& a, const Yolo::Detection& b) {
     return a.det_confidence > b.det_confidence;
 }
 
-void nms(std::vector<Yolo::Detection>& res, float *output, float nms_thresh = NMS_THRESH) { // ham loc bounding box theo NMS, co su dung ham cmp va iou
-    std::map<float, std::vector<Yolo::Detection>> m;                                        
+void nms(std::vector<Yolo::Detection>& res, float *output, float nms_thresh = NMS_THRESH) {
+    std::map<float, std::vector<Yolo::Detection>> m;
     for (int i = 0; i < output[0] && i < Yolo::MAX_OUTPUT_BBOX_COUNT; i++) {
         if (output[1 + DETECTION_SIZE * i + 4] <= BBOX_CONF_THRESH) continue;
         Yolo::Detection det;
@@ -119,7 +121,7 @@ void nms(std::vector<Yolo::Detection>& res, float *output, float nms_thresh = NM
             }
         }
     }
-} // -------res se chua cac bounding box da duoc loc
+}
 
 // TensorRT weight files have a simple space delimited format:
 // [type] [size] <data x size in hex>
@@ -161,7 +163,6 @@ std::map<std::string, Weights> loadWeights(const std::string file) {
     return weightMap;
 }
 
-/// toi uu hoa sau, thay doi tuy vao model
 IScaleLayer* addBatchNorm2d(INetworkDefinition *network, std::map<std::string, Weights>& weightMap, ITensor& input, std::string lname, float eps) {
     float *gamma = (float*)weightMap[lname + ".weight"].values;
     float *beta = (float*)weightMap[lname + ".bias"].values;
@@ -228,15 +229,14 @@ ILayer* convBnLeaky(INetworkDefinition *network, std::map<std::string, Weights>&
 }
 
 // Creat the engine using only the API and not any parser.
-ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilderConfig* config, DataType dt, std::string model_path) {
+ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilderConfig* config, DataType dt) {
     INetworkDefinition* network = builder->createNetworkV2(0U);
 
     // Create input tensor of shape {3, INPUT_H, INPUT_W} with name INPUT_BLOB_NAME
     ITensor* data = network->addInput(INPUT_BLOB_NAME, dt, Dims3{3, INPUT_H, INPUT_W});
     assert(data);
 
-    std::map<std::string, Weights> weightMap = loadWeights(model_path);  // path of .weight
-    //std::map<std::string, Weights> weightMap = loadWeights("../yolov4.wts"); 
+    std::map<std::string, Weights> weightMap = loadWeights("../yolov4.wts");
     Weights emptywts{DataType::kFLOAT, nullptr, 0};
 
     // define each layer.
@@ -477,11 +477,11 @@ ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilder
     yolo->getOutput(0)->setName(OUTPUT_BLOB_NAME);
     network->markOutput(*yolo->getOutput(0));
 
-    // Build engine, phan nay co the dung chung giua cac Model
+    // Build engine
     builder->setMaxBatchSize(maxBatchSize);
-    config->setMaxWorkspaceSize(16 * (1 << 20));  // 16MB //khac nhau
+    config->setMaxWorkspaceSize(16 * (1 << 20));  // 16MB
 #ifdef USE_FP16
-    config->setFlag(BuilderFlag::kFP16);     // khac nhau
+    config->setFlag(BuilderFlag::kFP16);
 #endif
     std::cout << "Building tensorrt engine, please wait for a while..." << std::endl;
     ICudaEngine* engine = builder->buildEngineWithConfig(*network, *config);
@@ -499,13 +499,13 @@ ICudaEngine* createEngine(unsigned int maxBatchSize, IBuilder* builder, IBuilder
     return engine;
 }
 
-void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream, std::string model_path) { // giong het nhau
+void APIToModel(unsigned int maxBatchSize, IHostMemory** modelStream) {
     // Create builder
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
 
     // Create model to populate the network, then set the outputs and create an engine
-    ICudaEngine* engine = createEngine(maxBatchSize, builder, config, DataType::kFLOAT, model_path);
+    ICudaEngine* engine = createEngine(maxBatchSize, builder, config, DataType::kFLOAT);
     assert(engine != nullptr);
 
     // Serialize the engine
@@ -515,21 +515,6 @@ void APIToModel( unsigned int maxBatchSize, IHostMemory** modelStream, std::stri
     engine->destroy();
     builder->destroy();
     config->destroy();
-}
-
-trt_error TRT_Inference::trt_APIModel(std::string model_path){
-    IHostMemory* modelStream{nullptr};
-    APIToModel(BATCH_SIZE, &modelStream, model_path);
-    assert(modelStream != nullptr);
-    // them duong dan tuy chon o day 
-    std::ofstream p("yolov4.engine", std::ios::binary); 
-    if (!p) {
-        std::cerr << "could not open plan output file" << std::endl;
-        return TRT_RESULT_ERROR;
-    }
-    p.write(reinterpret_cast<const char*>(modelStream->data()), modelStream->size());
-    modelStream->destroy();
-    return TRT_RESULT_SUCCESS;
 }
 
 void doInference(IExecutionContext& context, float* input, float* output, int batchSize) {
@@ -546,14 +531,14 @@ void doInference(IExecutionContext& context, float* input, float* output, int ba
     const int outputIndex = engine.getBindingIndex(OUTPUT_BLOB_NAME);
 
     // Create GPU buffers on device
-    CUDA_CHECK(cudaMalloc(&buffers[inputIndex], batchSize * 3 * INPUT_H * INPUT_W * sizeof(float))); // khac nhau
+    CUDA_CHECK(cudaMalloc(&buffers[inputIndex], batchSize * 3 * INPUT_H * INPUT_W * sizeof(float)));
     CUDA_CHECK(cudaMalloc(&buffers[outputIndex], batchSize * OUTPUT_SIZE * sizeof(float)));
 
     // Create stream
     cudaStream_t stream;
     CUDA_CHECK(cudaStreamCreate(&stream));
 
-    // DMA input batch data to device, infer on the batch asynchronously, and DMA output back to host, KHAC NHAU
+    // DMA input batch data to device, infer on the batch asynchronously, and DMA output back to host
     CUDA_CHECK(cudaMemcpyAsync(buffers[inputIndex], input, batchSize * 3 * INPUT_H * INPUT_W * sizeof(float), cudaMemcpyHostToDevice, stream));
     context.enqueue(batchSize, buffers, stream, nullptr);
     CUDA_CHECK(cudaMemcpyAsync(output, buffers[outputIndex], batchSize * OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost, stream));
@@ -565,135 +550,140 @@ void doInference(IExecutionContext& context, float* input, float* output, int ba
     CUDA_CHECK(cudaFree(buffers[outputIndex]));
 }
 
-
-std::string extractPrefix(const std::string& input) {
-    // Tìm vị trí của ".wts" trong chuỗi
-    size_t pos = input.find(".wts");
-    
-    // Kiểm tra xem ".wts" có xuất hiện trong chuỗi hay không
-    if (pos != std::string::npos) {
-        // Lấy phần trước ".wts"
-        std::string prefix = input.substr(0, pos);
-        // Tìm vị trí cuối cùng của '/' để lấy phần cuối cùng
-        size_t lastSlash = prefix.find_last_of('/');
-        if (lastSlash != std::string::npos) {
-            prefix = prefix.substr(lastSlash + 1);
-        }
-        return prefix;
-    } else {
-        // Không tìm thấy ".wts" trong chuỗi
-        return "";
+int read_files_in_dir(const char *p_dir_name, std::vector<std::string> &file_names) {
+    DIR *p_dir = opendir(p_dir_name);
+    if (p_dir == nullptr) {
+        return -1;
     }
+
+    struct dirent* p_file = nullptr;
+    while ((p_file = readdir(p_dir)) != nullptr) {
+        if (strcmp(p_file->d_name, ".") != 0 &&
+                strcmp(p_file->d_name, "..") != 0) {
+            //std::string cur_file_name(p_dir_name);
+            //cur_file_name += "/";
+            //cur_file_name += p_file->d_name;
+            std::string cur_file_name(p_file->d_name);
+            file_names.push_back(cur_file_name);
+        }
+    }
+
+    closedir(p_dir);
+    return 0;
 }
 
-trt_error TRT_Inference::init_inference(std::string engine_name){
+int main(int argc, char** argv) {
+    cudaSetDevice(DEVICE);
     // create a model using the API directly and serialize it to a stream
-    printf("Thuc hien ham Init\n");
     char *trtModelStream{nullptr};
     size_t size{0};
 
-    std::ifstream file(engine_name, std::ios::binary);
-    if (file.good()) {
-        file.seekg(0, file.end);
-        size = file.tellg();
-        file.seekg(0, file.beg);
-        trtModelStream = new char[size];
-        assert(trtModelStream);
-        file.read(trtModelStream, size);
-        file.close();
+    if (argc == 2 && std::string(argv[1]) == "-s") {
+        IHostMemory* modelStream{nullptr};
+        APIToModel(BATCH_SIZE, &modelStream);
+        assert(modelStream != nullptr);
+        std::ofstream p("yolov4.engine", std::ios::binary);
+        if (!p) {
+            std::cerr << "could not open plan output file" << std::endl;
+            return -1;
+        }
+        p.write(reinterpret_cast<const char*>(modelStream->data()), modelStream->size());
+        modelStream->destroy();
+        return 0;
+    } else if (argc == 3 && std::string(argv[1]) == "-d") {
+        std::ifstream file("yolov4.engine", std::ios::binary);
+        if (file.good()) {
+            file.seekg(0, file.end);
+            size = file.tellg();
+            file.seekg(0, file.beg);
+            trtModelStream = new char[size];
+            assert(trtModelStream);
+            file.read(trtModelStream, size);
+            file.close();
+        }
+    } else {
+        std::cerr << "arguments not right!" << std::endl;
+        std::cerr << "./yolov4 -s  // serialize model to plan file" << std::endl;
+        std::cerr << "./yolov4 -d ../samples  // deserialize plan file and run inference" << std::endl;
+        return -1;
     }
 
-    this->runtime = createInferRuntime(gLogger);
+    std::vector<std::string> file_names;
+    if (read_files_in_dir(argv[2], file_names) < 0) {
+        std::cout << "read_files_in_dir failed." << std::endl;
+        return -1;
+    }
+
+    // prepare input data ---------------------------
+    static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
+    //for (int i = 0; i < 3 * INPUT_H * INPUT_W; i++)
+    //    data[i] = 1.0;
+    static float prob[BATCH_SIZE * OUTPUT_SIZE];
+    IRuntime* runtime = createInferRuntime(gLogger);
     assert(runtime != nullptr);
-    this->engine = runtime->deserializeCudaEngine(trtModelStream, size);
+    ICudaEngine* engine = runtime->deserializeCudaEngine(trtModelStream, size);
     assert(engine != nullptr);
-    this->context = engine->createExecutionContext();
+    IExecutionContext* context = engine->createExecutionContext();
     assert(context != nullptr);
     delete[] trtModelStream;
 
-    printf("ket thuc ham Init\n");
-    return TRT_RESULT_SUCCESS;
-}
-
-
-trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs ){
-    static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
-    static float prob[BATCH_SIZE * OUTPUT_SIZE];
-
-    std::string output_images = "output_images";
-    fs::create_directories(output_images);
-    
     int fcount = 0;
-    int img_id=0;
-    for (int f = 0; f < (int) trt_inputs.size(); f++) {    
+    for (int f = 0; f < (int)file_names.size(); f++) {
         fcount++;
-        if (fcount < BATCH_SIZE && f + 1 != (int)trt_inputs.size() ) continue;
-        // xu li anh
+        if (fcount < BATCH_SIZE && f + 1 != (int)file_names.size()) continue;
         for (int b = 0; b < fcount; b++) {
-            //cv::Mat img = trt_inputs[f - fcount + 1 + b].input_img;
-            cv::Mat img = trt_inputs[img_id + b].input_img;
-            if(!img.empty()){
-            cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
+            cv::Mat img = cv::imread(std::string(argv[2]) + "/" + file_names[f - fcount + 1 + b]);
+            if (img.empty()) continue;
+            cv::Mat pr_img = preprocess_img(img);
             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
                 data[b * 3 * INPUT_H * INPUT_W + i] = pr_img.at<cv::Vec3b>(i)[2] / 255.0;
                 data[b * 3 * INPUT_H * INPUT_W + i + INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[1] / 255.0;
                 data[b * 3 * INPUT_H * INPUT_W + i + 2 * INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[0] / 255.0;
             }
-            }
         }
-    
 
         // Run inference
         auto start = std::chrono::system_clock::now();
         doInference(*context, data, prob, BATCH_SIZE);
         auto end = std::chrono::system_clock::now();
         std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
-        
         std::vector<std::vector<Yolo::Detection>> batch_res(fcount);
         for (int b = 0; b < fcount; b++) {
             auto& res = batch_res[b];
             nms(res, &prob[b * OUTPUT_SIZE]);
         }
-
-        std::cout <<"kich thuoc cua fcount:" <<fcount <<std::endl;
-
         for (int b = 0; b < fcount; b++) {
-        auto& res = batch_res[b];
-        std::vector<trt_results> image_result;
-        IMXAIEngine::trt_output out_img;
-
-        // doc anh
-        cv::Mat img = cv::imread( outputDir + "/frame_" + std::to_string(img_id + b) + ".png" );
+            auto& res = batch_res[b];
+            //std::cout << res.size() << std::endl;
+            cv::Mat img = cv::imread(std::string(argv[2]) + "/" + file_names[f - fcount + 1 + b]);
             for (size_t j = 0; j < res.size(); j++) {
-                trt_results boundingbox_result;
-                boundingbox_result.ClassID = res[j].class_id;
-                boundingbox_result.Confidence = res[j].det_confidence;
-                boundingbox_result.bbox[0] = res[j].bbox[0];
-                boundingbox_result.bbox[1] = res[j].bbox[1];
-                boundingbox_result.bbox[2] = res[j].bbox[2];
-                boundingbox_result.bbox[3] = res[j].bbox[3];
-
-            //image_result.push_back(boundingbox_result);
-            out_img.results.push_back(boundingbox_result);
-
-            cv::Rect r = get_rect(img, res[j].bbox);
-            cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
-            cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
+                //float *p = (float*)&res[j];
+                //for (size_t k = 0; k < 7; k++) {
+                //    std::cout << p[k] << ", ";
+                //}
+                //std::cout << std::endl;
+                cv::Rect r = get_rect(img, res[j].bbox);
+                cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
+                cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
+            }
+            cv::imwrite("_" + file_names[f - fcount + 1 + b], img);
         }
-
-        cv::imwrite(output_images + "/frame_" + std::to_string(img_id + b) + ".png", img);
-
-
-        // Thêm image_result vào results
-        out_img.id= img_id + b ; 
-        trt_outputs.push_back(out_img);
-        }
-
-        // Di chuyển việc reset fcount xuống cuối vòng lặp
-        img_id= img_id + fcount;
         fcount = 0;
     }
-    
 
-    return TRT_RESULT_SUCCESS;
+    // Destroy the engine
+    context->destroy();
+    engine->destroy();
+    runtime->destroy();
+
+    //Print histogram of the output distribution
+    //std::cout << "\nOutput:\n\n";
+    //for (unsigned int i = 0; i < OUTPUT_SIZE; i++)
+    //{
+    //    std::cout << prob[i] << ", ";
+    //    if (i % 10 == 0) std::cout << i / 10 << std::endl;
+    //}
+    //std::cout << std::endl;
+
+    return 0;
 }
