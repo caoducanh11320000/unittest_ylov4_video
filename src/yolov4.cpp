@@ -27,9 +27,9 @@ int main(int argc, char** argv){
         // co the goi ham API model o day
         test1.trt_APIModel( std::string(argv[2]) );     
     } 
-    else if (argc == 3 && std::string(argv[1]) == "-d") {
+    else if (argc == 4 && std::string(argv[1]) == "-d") {
         // goi ham init
-        test1.init_inference(argv[2],file_image);
+        test1.init_inference(std::string(argv[2]), argv[3], file_image);
      
     } 
     else {
@@ -47,7 +47,7 @@ int main(int argc, char** argv){
         std::cout <<"Ten anh la:" << file_image[i] <<std::endl;
     }
 
-    std::string folder= std::string(argv[2]);
+    std::string folder= std::string(argv[3]);
     for(int i=0; i< (int)file_image.size(); i++){
 
         std::cout << "Thuc hien voi anh:" << i <<std::endl;
@@ -76,7 +76,7 @@ int main(int argc, char** argv){
     std::cout << x.results.size() << std::endl;
     for (int j = 0; j < (int)x.results.size(); j++)
     {
-        std::cout << "Bounding box: " << x.results[j].ClassID << x.results[j].Confidence << x.results[j].bbox[0] << x.results[j].bbox[1] << x.results[j].bbox[2] << x.results[j].bbox[3] << std::endl;
+        std::cout << "Bounding box: " << x.results[j].ClassID<<" " << x.results[j].Confidence<<" " << x.results[j].bbox[0]<<" " << x.results[j].bbox[1]<<" " << x.results[j].bbox[2]<<" " << x.results[j].bbox[3] << std::endl;
     }
     }
 

@@ -6,7 +6,7 @@
 #define NMS_THRESH 0.4
 #define BBOX_CONF_THRESH 0.5
 
-#define BATCH_SIZE 2
+#define BATCH_SIZE 1
 
 
 using namespace IMXAIEngine;
@@ -587,13 +587,34 @@ int read_files_in_dir(const char *p_dir_name, std::vector<std::string> &file_nam
     return 0;
 }
 
-trt_error TRT_Inference::init_inference(const char * input_folder, std::vector<std::string> &file_names){
+std::string extractPrefix(const std::string& input) {
+    // Tìm vị trí của ".wts" trong chuỗi
+    size_t pos = input.find(".wts");
+    
+    // Kiểm tra xem ".wts" có xuất hiện trong chuỗi hay không
+    if (pos != std::string::npos) {
+        // Lấy phần trước ".wts"
+        std::string prefix = input.substr(0, pos);
+        // Tìm vị trí cuối cùng của '/' để lấy phần cuối cùng
+        size_t lastSlash = prefix.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            prefix = prefix.substr(lastSlash + 1);
+        }
+        return prefix;
+    } else {
+        // Không tìm thấy ".wts" trong chuỗi
+        return "";
+    }
+}
+
+trt_error TRT_Inference::init_inference(std::string engine_name , const char * input_folder, std::vector<std::string> &file_names){
     // create a model using the API directly and serialize it to a stream
     printf("Thuc hien ham Init\n");
     char *trtModelStream{nullptr};
     size_t size{0};
 
-    std::ifstream file("yolov4.engine", std::ios::binary);
+    //std::ifstream file("yolov4.engine", std::ios::binary);
+    std::ifstream file(engine_name, std::ios::binary);
     if (file.good()) {
         file.seekg(0, file.end);
         size = file.tellg();
@@ -623,47 +644,49 @@ trt_error TRT_Inference::init_inference(const char * input_folder, std::vector<s
     return TRT_RESULT_SUCCESS;
 }
 
-bool isImage(const std::string& filename) {
-    // Danh sách các phần mở rộng cho ảnh
-    std::vector<std::string> imageExtensions = {".jpg", ".jpeg", ".png", ".bmp"};
+// bool isImage(const std::string& filename) {
+//     // Danh sách các phần mở rộng cho ảnh
+//     std::vector<std::string> imageExtensions = {".jpg", ".jpeg", ".png", ".bmp"};
 
-    // Tìm phần mở rộng của tệp
-    size_t dotPosition = filename.find_last_of(".");
-    if (dotPosition != std::string::npos) {
-        std::string extension = filename.substr(dotPosition);
+//     // Tìm phần mở rộng của tệp
+//     size_t dotPosition = filename.find_last_of(".");
+//     if (dotPosition != std::string::npos) {
+//         std::string extension = filename.substr(dotPosition);
         
-        // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+//         // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
+//         std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
 
-        // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của ảnh không
-        if (std::find(imageExtensions.begin(), imageExtensions.end(), extension) != imageExtensions.end()) return true;
-        return false;
-    }
+//         // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của ảnh không
+//         if (std::find(imageExtensions.begin(), imageExtensions.end(), extension) != imageExtensions.end()) return true;
+//         return false;
+//     }
 
-    // Nếu không có phần mở rộng, giả định là không phải ảnh
-    return false;
-}
+//     // Nếu không có phần mở rộng, giả định là không phải ảnh
+//     return false;
+// }
 
-bool isVideo(const std::string& filename) {
-    // Danh sách các phần mở rộng cho video
-    std::vector<std::string> videoExtensions = {".mp4", ".avi", ".mkv"};
+// bool isVideo(const std::string& filename) {
+//     // Danh sách các phần mở rộng cho video
+//     std::vector<std::string> videoExtensions = {".mp4", ".avi", ".mkv"};
 
-    // Tìm phần mở rộng của tệp
-    size_t dotPosition = filename.find_last_of(".");
-    if (dotPosition != std::string::npos) {
-        std::string extension = filename.substr(dotPosition);
+//     // Tìm phần mở rộng của tệp
+//     size_t dotPosition = filename.find_last_of(".");
+//     if (dotPosition != std::string::npos) {
+//         std::string extension = filename.substr(dotPosition);
         
-        // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
-        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+//         // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
+//         std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
 
-        // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của video không
-        if( std::find(videoExtensions.begin(), videoExtensions.end(), extension) != videoExtensions.end()) return true;
-        return false;
-    }
+//         // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của video không
+//         if( std::find(videoExtensions.begin(), videoExtensions.end(), extension) != videoExtensions.end()) return true;
+//         return false;
+//     }
 
-    // Nếu không có phần mở rộng, giả định là không phải video
-    return false;
-}
+//     // Nếu không có phần mở rộng, giả định là không phải video
+//     return false;
+// }
+
+
 
 trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs ){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
