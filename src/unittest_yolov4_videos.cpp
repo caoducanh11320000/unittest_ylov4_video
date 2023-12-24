@@ -1,14 +1,14 @@
 #include <iostream>
 #include "trt_inference.h"
 #include <opencv2/opencv.hpp>
-#include <filesystem>
+#include <experimental/filesystem>
 
 #define DEVICE 0  // GPU id
 
 
 using namespace IMXAIEngine;
 using namespace nvinfer1;
-namespace fs = std::filesystem;
+namespace fs = std::experimental::filesystem;
 
 TRT_Inference test1;
 std::vector<std::string> file_image;
@@ -28,6 +28,7 @@ int main(int argc, char** argv){
     if (argc == 3 && std::string(argv[1]) == "-s") { // modify argc if you want
         // co the goi ham API model o day
         test1.trt_APIModel( std::string(argv[2]) );     
+        return 1;
     } 
     else if (argc == 4 && std::string(argv[1]) == "-d") {
         // goi ham init
@@ -43,7 +44,7 @@ int main(int argc, char** argv){
 
     // chuyen video thanh anh
     std::string video_path = std::string(argv[3]);
-    cv::VideoCapture cap(video_path)
+    cv::VideoCapture cap(video_path);
     if(!cap.isOpened()){
         std::cout <<" Khong the mo video" <<std::endl;
     }
@@ -62,16 +63,16 @@ int main(int argc, char** argv){
 
         // Lưu khung hình thành ảnh trong thư mục cụ thể
         std::string filename = outputDir + "/frame_" + std::to_string(id_img) + ".png";
-        cv::imwrite(filename, frame);  // ti nua truyen outputDir vao trt_detection
+        cv::imwrite(filename, img);  // ti nua truyen outputDir vao trt_detection
 
         trt_input.id_img= id_img;
         trt_input.input_img= img;
         trt_inputs.push_back(trt_input);
-        id ++;
+        id_img ++;
     }
 
    
-    test1.trt_detection(trt_inputs, trt_outputs);
+    test1.trt_detection(trt_inputs, trt_outputs,outputDir );
 
     std::cout << "so luong ket qua:" << trt_outputs.size() << std::endl;
 

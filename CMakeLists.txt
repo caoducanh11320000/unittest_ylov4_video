@@ -7,7 +7,8 @@ enable_language(CXX)
 add_definitions(-std=c++11)
 
 option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
-set(CMAKE_CXX_STANDARD 11)
+# set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Debug)
 
 find_package(CUDA REQUIRED)
@@ -34,8 +35,10 @@ target_link_libraries(myplugins nvinfer cudart)
 # add_executable(yolov4 ${PROJECT_SOURCE_DIR}/yolov4.cpp)
 
 FILE(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/include/*.h)  #thu ko  bao gom ca .h xem co duoc ko
+
 add_executable(yolov4 ${SRC_FILES})
 target_link_libraries(yolov4 nvinfer)
 target_link_libraries(yolov4 cudart)
 target_link_libraries(yolov4 myplugins)
 target_link_libraries(yolov4 ${OpenCV_LIBS})
+target_link_libraries(yolov4 stdc++fs)

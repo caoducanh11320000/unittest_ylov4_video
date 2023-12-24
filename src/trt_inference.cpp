@@ -11,6 +11,7 @@
 
 using namespace IMXAIEngine;
 using namespace nvinfer1;
+namespace fs = std::experimental::filesystem;
 
 // do the thay doi sau
 static const int INPUT_H = Yolo::INPUT_H;
@@ -616,7 +617,7 @@ trt_error TRT_Inference::init_inference(std::string engine_name){
 }
 
 
-trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs ){
+trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs, std::string outputDir){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
