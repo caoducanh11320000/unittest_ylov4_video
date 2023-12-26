@@ -49,7 +49,7 @@ int main(int argc, char** argv){
         std::cout <<" Khong the mo video" <<std::endl;
     }
     // tao duong dan thu muc
-    std::string outputDir = "image";
+    std::string outputDir = "images";
     fs::create_directories(outputDir);
     int id_img=0;
     IMXAIEngine::trt_input trt_input;
@@ -64,27 +64,32 @@ int main(int argc, char** argv){
         // Lưu khung hình thành ảnh trong thư mục cụ thể
         std::string filename = outputDir + "/frame_" + std::to_string(id_img) + ".png";
         cv::imwrite(filename, img);  // ti nua truyen outputDir vao trt_detection
-
-        trt_input.id_img= id_img;
-        trt_input.input_img= img;
-        trt_inputs.push_back(trt_input);
         id_img ++;
     }
 
-   
-    test1.trt_detection(trt_inputs, trt_outputs,outputDir );
 
-    std::cout << "so luong ket qua:" << trt_outputs.size() << std::endl;
+    std::cout<< "So luong anh la: " <<id_img<< std::endl;
+    for(int i=0; i< id_img; i++)
+    {   std::cout << "Bat dau doc anh" <<std::endl;
+        cv::Mat inp_img = cv::imread( outputDir + "/frame_" + std::to_string(i) + ".png" );
+        if(!inp_img.empty()){
+        trt_input.id_img= i;
+        trt_input.input_img= inp_img;
+        trt_inputs.push_back(trt_input);
+        }
+        else{
+            std::cout<<"Thuc hien ko thanh cong voi anh: " << i<< std::endl;
+        }
+        if((i+1) % 8 ==0){
+            
+            std::cout << "So luong dau vao: " << trt_inputs.size() << std::endl;
+            test1.trt_detection(trt_inputs, trt_outputs,outputDir );
+            std::cout << "So luong dau ra: " << trt_outputs.size()<< std::endl;
+            
+            trt_inputs.clear();
+            std::vector< IMXAIEngine::trt_input> ().swap(trt_inputs) ;
 
-    for (int i = 0; i < (int) trt_outputs.size(); i++) 
-    {
-    auto x = trt_outputs[i];
-    std::cout << "ID anh: " <<x.id << std::endl;
-    std::cout << x.results.size() << std::endl;
-    for (int j = 0; j < (int)x.results.size(); j++)
-    {
-        std::cout << "Bounding box: " << x.results[j].ClassID<<" " << x.results[j].Confidence<<" " << x.results[j].bbox[0]<<" " << x.results[j].bbox[1]<<" " << x.results[j].bbox[2]<<" " << x.results[j].bbox[3] << std::endl;
+        }
     }
-    }
-
+    
 }

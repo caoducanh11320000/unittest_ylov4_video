@@ -625,14 +625,15 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
     fs::create_directories(output_images);
     
     int fcount = 0;
-    int img_id=0;
-    for (int f = 0; f < (int) trt_inputs.size(); f++) {    
+    static int img_id = 0;
+    static int time =0;
+    for (int f = 0; f < (int) trt_inputs.size() ; f++) {    // day chinh la van de
         fcount++;
         if (fcount < BATCH_SIZE && f + 1 != (int)trt_inputs.size() ) continue;
         // xu li anh
         for (int b = 0; b < fcount; b++) {
             //cv::Mat img = trt_inputs[f - fcount + 1 + b].input_img;
-            cv::Mat img = trt_inputs[img_id + b].input_img;
+            cv::Mat img = trt_inputs[img_id + b - time*(int)trt_inputs.size() ].input_img;   // no se chay qua, vi trt_inputs.size() co size 
             if(!img.empty()){
             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
@@ -665,6 +666,7 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
 
         // doc anh
         cv::Mat img = cv::imread( outputDir + "/frame_" + std::to_string(img_id + b) + ".png" );
+        if(!img.empty()){
             for (size_t j = 0; j < res.size(); j++) {
                 trt_results boundingbox_result;
                 boundingbox_result.ClassID = res[j].class_id;
@@ -681,20 +683,28 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
             cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
             cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
         }
+        
 
         cv::imwrite(output_images + "/frame_" + std::to_string(img_id + b) + ".png", img);
-
+        
 
         // Thêm image_result vào results
         out_img.id= img_id + b ; 
         trt_outputs.push_back(out_img);
+        
+        }
+        else{
+            std::cout << "Ko co anh de doc" <<std::endl;
+        }
         }
 
         // Di chuyển việc reset fcount xuống cuối vòng lặp
         img_id= img_id + fcount;
         fcount = 0;
+        std::cout <<"Thuc hien xong voi anhhhhh" <<std::endl;
     }
-    
+    time= time +1;
+    std::cout <<"Thuc hien xongggggggggg" <<std::endl;
 
     return TRT_RESULT_SUCCESS;
 }
