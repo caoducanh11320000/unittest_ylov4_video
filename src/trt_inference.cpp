@@ -621,8 +621,6 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
-    std::string output_images = "output_images";
-    fs::create_directories(output_images);
     
     int fcount = 0;
     static int img_id = 0;
@@ -685,8 +683,8 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
         }
         
 
-        cv::imwrite(output_images + "/frame_" + std::to_string(img_id + b) + ".png", img);
-        
+        //cv::imwrite(output_images + "/frame_" + std::to_string(img_id + b) + ".png", img);
+        trt_inputs[img_id + b - time*(int)trt_inputs.size() ].input_img = img;
 
         // Thêm image_result vào results
         out_img.id= img_id + b ; 
