@@ -617,7 +617,7 @@ trt_error TRT_Inference::init_inference(std::string engine_name){
 }
 
 
-trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs, std::string outputDir){
+trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
 
@@ -663,7 +663,8 @@ trt_error TRT_Inference::trt_detection(std::vector<IMXAIEngine::trt_input> &trt_
         IMXAIEngine::trt_output out_img;
 
         // doc anh
-        cv::Mat img = cv::imread( outputDir + "/frame_" + std::to_string(img_id + b) + ".png" );
+        //cv::Mat img = cv::imread( outputDir + "/frame_" + std::to_string(img_id + b) + ".png" );
+        cv::Mat img = trt_inputs[img_id + b - time*(int)trt_inputs.size() ].input_img;
         if(!img.empty()){
             for (size_t j = 0; j < res.size(); j++) {
                 trt_results boundingbox_result;

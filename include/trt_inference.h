@@ -75,7 +75,7 @@ namespace IMXAIEngine
         }
         trt_error init_inference(std::string engine_name); 
         trt_error trt_APIModel(std::string model_path);
-        trt_error trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs, std::string outputDir );
+        trt_error trt_detection(std::vector<IMXAIEngine::trt_input> &trt_inputs, std::vector<IMXAIEngine::trt_output> &trt_outputs);
     };
 
 } // namespace IMXAIEngine

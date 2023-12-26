@@ -17,7 +17,7 @@ std::vector< std::vector<trt_results>> results;
 std::vector< IMXAIEngine:: trt_input> trt_inputs;
 std::vector< IMXAIEngine:: trt_output> trt_outputs;
 
-std::string outputVideoPath = "output_video.avi";
+std::string outputVideoPath = "videotest_1.avi";
 cv::Size imageSize(640, 480);  // Thay đổi kích thước theo ý muốn
 
 
@@ -49,8 +49,9 @@ int main(int argc, char** argv){
         std::cout <<" Khong the mo video" <<std::endl;
     }
     // tao duong dan thu muc
-    std::string outputDir = "images";
-    fs::create_directories(outputDir);
+    // std::string outputDir = "images";
+    // fs::create_directories(outputDir);
+
     int id_img=0;
     IMXAIEngine::trt_input trt_input;
 
@@ -64,37 +65,18 @@ int main(int argc, char** argv){
             break;
         }
 
-        // Lưu khung hình thành ảnh trong thư mục cụ thể
-        std::string filename = outputDir + "/frame_" + std::to_string(id_img) + ".png";
-        cv::imwrite(filename, img);  // ti nua truyen outputDir vao trt_detection
-        id_img ++;
-    }
+        // // Lưu khung hình thành ảnh trong thư mục cụ thể
+        // std::string filename = outputDir + "/frame_" + std::to_string(id_img) + ".png";
+        // cv::imwrite(filename, img);  // ti nua truyen outputDir vao trt_detection
 
-    std::string output_images = "output_images";
-    fs::create_directories(output_images);
-
-    std::cout<< "So luong anh la: " <<id_img<< std::endl;
-    if (!videoWriter.isOpened()) {
-        std::cerr << "Không thể tạo video writer." << std::endl;
-        return -1;
-    }
-    
-    for(int i=0; i< 32; i++)  /////////////// id_img
-    {   
-        std::cout << "Bat dau doc anh" <<std::endl;
-        cv::Mat inp_img = cv::imread( outputDir + "/frame_" + std::to_string(i) + ".png" );
-        if(!inp_img.empty()){
-        trt_input.id_img= i;
-        trt_input.input_img= inp_img;
+        trt_input.id_img= id_img;
+        trt_input.input_img= img;
         trt_inputs.push_back(trt_input);
-        }
-        else{
-            std::cout<<"Thuc hien ko thanh cong voi anh: " << i<< std::endl;
-        }
-        if((i+1) % 8 ==0){
+
+        if((id_img+1) % 8 ==0){
             
             std::cout << "So luong dau vao: " << trt_inputs.size() << std::endl;
-            test1.trt_detection(trt_inputs, trt_outputs,outputDir );
+            test1.trt_detection(trt_inputs, trt_outputs);
             std::cout << "So luong dau ra: " << trt_outputs.size()<< std::endl;
             
             for(int j=0; j< 8; j++){
@@ -107,7 +89,48 @@ int main(int argc, char** argv){
             trt_outputs.clear();
             std::vector< IMXAIEngine::trt_output> ().swap(trt_outputs) ;
         }
+
+        id_img ++;
     }
+
+    // std::string output_images = "output_images";
+    // fs::create_directories(output_images);
+
+    // std::cout<< "So luong anh la: " <<id_img<< std::endl;
+    // if (!videoWriter.isOpened()) {
+    //     std::cerr << "Không thể tạo video writer." << std::endl;
+    //     return -1;
+    // }
+    
+    // for(int i=0; i< 32; i++)  /////////////// id_img
+    // {   
+    //     std::cout << "Bat dau doc anh" <<std::endl;
+    //     cv::Mat inp_img = cv::imread( outputDir + "/frame_" + std::to_string(i) + ".png" );
+    //     if(!inp_img.empty()){
+    //     trt_input.id_img= i;
+    //     trt_input.input_img= inp_img;
+    //     trt_inputs.push_back(trt_input);
+    //     }
+    //     else{
+    //         std::cout<<"Thuc hien ko thanh cong voi anh: " << i<< std::endl;
+    //     }
+    //     if((i+1) % 8 ==0){
+            
+    //         std::cout << "So luong dau vao: " << trt_inputs.size() << std::endl;
+    //         test1.trt_detection(trt_inputs, trt_outputs,outputDir );
+    //         std::cout << "So luong dau ra: " << trt_outputs.size()<< std::endl;
+            
+    //         for(int j=0; j< 8; j++){
+    //             cv::Mat img1 = trt_inputs[j].input_img;
+    //             cv::resize(img1, img1, imageSize);
+    //             videoWriter.write(img1);
+    //         }
+    //         trt_inputs.clear();
+    //         std::vector< IMXAIEngine::trt_input> ().swap(trt_inputs) ;
+    //         trt_outputs.clear();
+    //         std::vector< IMXAIEngine::trt_output> ().swap(trt_outputs) ;
+    //     }
+    // }
     
     // Đóng video writer
     videoWriter.release();
