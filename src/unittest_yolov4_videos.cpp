@@ -10,19 +10,21 @@ using namespace IMXAIEngine;
 using namespace nvinfer1;
 namespace fs = std::experimental::filesystem;
 
-TRT_Inference test1;
+// TRT_Inference test1;
 std::vector<std::string> file_image;
 std::vector<cv::Mat> input_img; 
 std::vector< std::vector<trt_results>> results;
 std::vector< IMXAIEngine:: trt_input> trt_inputs;
 std::vector< IMXAIEngine:: trt_output> trt_outputs;
 
-std::string outputVideoPath = "videotest_1.avi";
+std::string outputVideoPath = "videotest_2.avi";
+std::string outputVideoPath2 = "videotest_3.avi";
 cv::Size imageSize(640, 480);  // Thay đổi kích thước theo ý muốn
 
 
 int main(int argc, char** argv){
 
+    TRT_Inference test1;
     cudaSetDevice(DEVICE);
 
     if (argc == 3 && std::string(argv[1]) == "-s") { // modify argc if you want
@@ -55,8 +57,8 @@ int main(int argc, char** argv){
     int id_img=0;
     IMXAIEngine::trt_input trt_input;
 
-    cv::VideoWriter videoWriter(outputVideoPath, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 20, imageSize);
-
+    cv::VideoWriter videoWriter(outputVideoPath, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 30, imageSize);
+    cv::VideoWriter videoWriter2(outputVideoPath2, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 30, imageSize);
     while(true){
         cv::Mat img;
         cap >> img;
@@ -82,14 +84,19 @@ int main(int argc, char** argv){
             for(int j=0; j< 8; j++){
                 cv::Mat img1 = trt_inputs[j].input_img;
                 cv::resize(img1, img1, imageSize);
-                videoWriter.write(img1);
+                if(id_img <1200){
+                    videoWriter.write(img1);
+                }
+                else{
+                    videoWriter2.write(img1);
+                }
             }
             trt_inputs.clear();
             std::vector< IMXAIEngine::trt_input> ().swap(trt_inputs) ;
             trt_outputs.clear();
             std::vector< IMXAIEngine::trt_output> ().swap(trt_outputs) ;
         }
-
+        std::cout << "Thuc hien voi anh: " << id_img << std::endl;
         id_img ++;
     }
 
@@ -134,8 +141,9 @@ int main(int argc, char** argv){
     
     // Đóng video writer
     videoWriter.release();
-
+    videoWriter2.release();
     std::cout << "Video đã được tạo thành công." << std::endl;
 
+    
     return 1;
 }
